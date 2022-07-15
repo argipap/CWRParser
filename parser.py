@@ -5,52 +5,43 @@ import sys
 from tqdm import tqdm
 
 
-def find_duplicates(initial_dictionary):
-    temp_list = []
+def find_asset_occurences(initial_dictionary, delimeter=";"):
     occurences = dict()
-    unique_asset_blocks = dict()
     items = initial_dictionary.items()
     with tqdm(
         desc="Find duplicate assets ...",
-        unit="parsing",
+        unit="assets",
         total=len(items),
     ) as bar:
-        for key, value in items:
-            if value not in temp_list:
-                temp_list.append(value)
-                unique_asset_blocks[key] = value
-
+        for _, value in items:
             asset_title = value[0]
-            if not occurences.get(asset_title):
-                occurences[asset_title] = 1
+            writers = re.sub("\s+"," ", ",".join(value[1:])) if len(value)>1 else ""
+            asset_record_key = f"{asset_title}{delimeter}{writers}"
+            if not occurences.get(asset_record_key):
+                occurences[asset_record_key] = 1
             else:
-                occurences[asset_title] = occurences.get(asset_title) + 1
+                occurences[asset_record_key] = occurences.get(asset_record_key) + 1
             bar.update(1)
-    return unique_asset_blocks, occurences
+    return occurences
 
 
-def write_unique(unique_asset_blocks):
+def write_unique(occurences):
     output_file = "unique_assets_results.csv"
     with open(output_file, "w") as csv_file:
-        total_uniq_assets = unique_asset_blocks.items()
+        total_occurences = occurences.items()
         with tqdm(
             desc=f"Write unique assets in file {output_file} ...",
-            unit="write_file",
-            total=len(total_uniq_assets),
+            unit="assets",
+            total=len(total_occurences),
         ) as bar:
             writer = csv.writer(csv_file, delimiter=";")
             header = ["asset_title", "writers"]
             writer.writerow(header)
-            for _, value in unique_asset_blocks.items():
-                csv_row = []
-                asset_title = value[0]
-                writers_list = value[1:]
-                csv_row.append(asset_title)
-                # deconstruct writers list to a string with comma seperated values
-                writers = ",".join(writers_list)
-                # use regular expression to replace multiple spaces into one and then write row
-                csv_row.append(re.sub('\s+',' ',writers))
-                writer.writerow(csv_row)
+            for asset_columns, occurence in total_occurences:
+                # unique are with occurence == 1
+                if occurence == 1:
+                    csv_row = asset_columns.split(";")
+                    writer.writerow(csv_row)
                 bar.update(1)
 
 
@@ -60,17 +51,16 @@ def write_duplicates(occurences):
         total_occurences = occurences.items()
         with tqdm(
             desc=f"Write duplicate assets in file {output_file} ...",
-            unit="write_file",
+            unit="assets",
             total=len(total_occurences),
         ) as bar:
             writer = csv.writer(csv_file, delimiter=";")
-            header = ["asset_title", "occurences"]
+            header = ["asset_title", "writers", "occurences"]
             writer.writerow(header)
-            for asset_title, occurence in total_occurences:
+            for asset_columns, occurence in total_occurences:
+                # duplicates are the ones with occurence>1
                 if occurence > 1:
-                    csv_row = []
-                    csv_row.append(asset_title)
-                    # add occurence
+                    csv_row = asset_columns.split(";")
                     csv_row.append(occurence)
                     writer.writerow(csv_row)
                 bar.update(1)
@@ -85,7 +75,7 @@ def main():
         total_lines = cwr_file.readlines()
         with tqdm(
             desc="Parsing CWR File Line by Line ...",
-            unit="read_file",
+            unit="lines",
             total=len(total_lines),
         ) as bar:
             for line in total_lines:
@@ -105,9 +95,9 @@ def main():
 
 
         
-        unique_asset_blocks, occurences = find_duplicates(asset_writer_dictionary)
+        occurences = find_asset_occurences(asset_writer_dictionary)
 
-    write_unique(unique_asset_blocks)
+    write_unique(occurences)
     write_duplicates(occurences)
 
 
