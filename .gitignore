@@ -1,2 +1,4 @@
 *.csv
 *.V21
+venv
+env
